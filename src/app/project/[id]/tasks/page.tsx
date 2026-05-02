@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -32,6 +32,8 @@ export default function TasksPage() {
     priority: 'medium',
     assignedTo: ''
   });
+  const [creatingTask, setCreatingTask] = useState(false);
+  const createTaskLockRef = useRef(false);
 
   const isAdmin = user?.role === 'admin';
   const currentProject = projects.find((p) => String(p._id) === String(projectId));
@@ -46,6 +48,9 @@ export default function TasksPage() {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (createTaskLockRef.current || creatingTask) return;
+    createTaskLockRef.current = true;
+    setCreatingTask(true);
     try {
       await createTask({
         title: newTask.title,
@@ -70,6 +75,9 @@ export default function TasksPage() {
           ? String((err.response.data as { message?: string }).message)
           : 'Could not create task';
       alert(msg);
+    } finally {
+      createTaskLockRef.current = false;
+      setCreatingTask(false);
     }
   };
 
@@ -222,9 +230,10 @@ export default function TasksPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  disabled={creatingTask}
+                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Create
+                  {creatingTask ? 'Creating…' : 'Create'}
                 </button>
               </div>
             </form>

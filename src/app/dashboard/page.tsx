@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardStats from '@/components/DashboardStats';
 import ProjectCard from '@/components/ProjectCard';
@@ -19,6 +19,8 @@ export default function DashboardPage() {
   const [projectDesc, setProjectDesc] = useState('');
   const [assignableUsers, setAssignableUsers] = useState<Array<{ _id: string; name: string; email: string }>>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const createLockRef = useRef(false);
 
   useEffect(() => {
     fetchProjects();
@@ -58,15 +60,34 @@ export default function DashboardPage() {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    await createProject({
-      name: projectName,
-      description: projectDesc,
-      members: selectedMemberIds.length ? selectedMemberIds : undefined
-    });
-    setShowModal(false);
-    setProjectName('');
-    setProjectDesc('');
-    setSelectedMemberIds([]);
+    if (createLockRef.current || creatingProject) return;
+    createLockRef.current = true;
+    setCreatingProject(true);
+    try {
+      await createProject({
+        name: projectName,
+        description: projectDesc,
+        members: selectedMemberIds.length ? selectedMemberIds : undefined
+      });
+      setShowModal(false);
+      setProjectName('');
+      setProjectDesc('');
+      setSelectedMemberIds([]);
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'response' in err && err.response &&
+        typeof err.response === 'object' &&
+        'data' in err.response &&
+        err.response.data &&
+        typeof err.response.data === 'object' &&
+        'message' in err.response.data
+          ? String((err.response.data as { message?: string }).message)
+          : 'Could not create project';
+      alert(msg);
+    } finally {
+      createLockRef.current = false;
+      setCreatingProject(false);
+    }
   };
 
   return (
@@ -164,9 +185,10 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                  disabled={creatingProject}
+                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Create
+                  {creatingProject ? 'Creating…' : 'Create'}
                 </button>
               </div>
             </form>
